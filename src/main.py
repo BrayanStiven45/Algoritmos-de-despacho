@@ -31,21 +31,20 @@ class SchedulerApp:
         self.update_table()
 
     def create_widgets(self):
-        # Frame para la tabla (izquierda)
+        # Frame para la tabla
         self.table_frame = tk.Frame(self.root)
         self.table_frame.pack(side=tk.LEFT, padx=10, pady=10)
 
-        # Tabla
-        self.tree = ttk.Treeview(self.table_frame, columns=("nombre", "rafaga", "tiempo de llegada"), show="headings")
-        self.tree.heading("nombre", text="Proceso")
-        self.tree.heading("rafaga", text="Ráfaga")
-        self.tree.heading("tiempo de llegada", text="Tiempo de llegada")
+        # Tabla de procesos
+        self.tree = ttk.Treeview(self.table_frame, columns=("nombre", "rafaga", "tiempo de llegada", "prioridad"), show="headings")
+        for col in ["nombre", "rafaga", "tiempo de llegada", "prioridad"]:
+            self.tree.heading(col, text=col.capitalize())
         self.tree.pack()
         
         # Hacer la tabla editable
         self.tree.bind("<Double-1>", self.on_double_click)
 
-        # Frame para controles (derecha)
+        # Frame de controles
         self.controls_frame = tk.Frame(self.root)
         self.controls_frame.pack(side=tk.RIGHT, padx=10, pady=10)
 
@@ -55,19 +54,22 @@ class SchedulerApp:
         self.algorithm_menu.pack()
         self.algorithm_menu.bind("<<ComboboxSelected>>", self.update_table)
 
-        # Campo Quantum (solo para Round Robin)
+        # Campo Quantum
         self.quantum_label = tk.Label(self.controls_frame, text="Quantum:")
         self.quantum_entry = tk.Entry(self.controls_frame)
 
-        # Botón para ejecutar
+        # Botones de control
+        self.add_button = tk.Button(self.controls_frame, text="Nuevo Proceso", command=self.add_process_window)
+        self.add_button.pack(pady=5)
+
+        self.delete_button = tk.Button(self.controls_frame, text="Eliminar Proceso", command=self.delete_process)
+        self.delete_button.pack(pady=5)
+
         self.run_button = tk.Button(self.controls_frame, text="Ejecutar", command=self.run_algorithm)
         self.run_button.pack(pady=5)
 
     def update_table(self, event=None):
-        # Limpiar tabla
-        for col in self.tree['columns']:
-            self.tree.heading(col, text="")
-        self.tree.delete(*self.tree.get_children())
+        self.tree.delete(*self.tree.get_children())  # Limpiar la tabla
 
         # Obtener algoritmo seleccionado
         algo = self.selected_algorithm.get()
@@ -111,13 +113,74 @@ class SchedulerApp:
             entry.bind("<Return>", on_enter)
             entry.bind("<FocusOut>", lambda e: entry.destroy())
 
+    def add_process_window(self):
+        """ Abre una nueva ventana para agregar un proceso """
+        new_window = tk.Toplevel(self.root)
+        new_window.title("Nuevo Proceso")
+        new_window.geometry("250x200")
+
+        tk.Label(new_window, text="Nombre:").pack()
+        name_entry = tk.Entry(new_window)
+        name_entry.pack()
+
+        tk.Label(new_window, text="Ráfaga:").pack()
+        burst_entry = tk.Entry(new_window)
+        burst_entry.pack()
+
+        tk.Label(new_window, text="Tiempo de llegada:").pack()
+        arrival_entry = tk.Entry(new_window)
+        arrival_entry.pack()
+
+        tk.Label(new_window, text="Prioridad:").pack()
+        priority_entry = tk.Entry(new_window)
+        priority_entry.pack()
+
+        def add_process():
+            nombre = name_entry.get().strip()
+            try:
+                rafaga = int(burst_entry.get())
+                tiempo_llegada = int(arrival_entry.get())
+                prioridad = int(priority_entry.get())
+                
+                if not nombre:
+                    raise ValueError("El nombre no puede estar vacío.")
+                
+                self.procesos.append({
+                    "nombre": nombre,
+                    "rafaga": rafaga,
+                    "tiempo de llegada": tiempo_llegada,
+                    "prioridad": prioridad
+                })
+                
+                self.update_table()
+                new_window.destroy()
+            except ValueError:
+                messagebox.showerror("Error", "Por favor, ingrese valores válidos.")
+
+        tk.Button(new_window, text="Agregar", command=add_process).pack(pady=10)
+
+    def delete_process(self):
+        """ Elimina el proceso seleccionado de la tabla """
+        selected_item = self.tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Atención", "Seleccione un proceso para eliminar.")
+            return
+        
+        for item in selected_item:
+            proceso_nombre = self.tree.item(item, "values")[0]
+            self.procesos = [p for p in self.procesos if p["nombre"] != proceso_nombre]
+            self.tree.delete(item)
+
     def run_algorithm(self):
+        """ Ejecuta el algoritmo seleccionado con los datos actuales """
         algo = self.selected_algorithm.get()
         quantum = int(self.quantum_entry.get()) if algo == "Round Robin" else None
         
         procesos = [
-            {"nombre": self.tree.item(item)['values'][0], "rafaga": int(self.tree.item(item)['values'][1]),
-             "tiempo de llegada": int(self.tree.item(item)['values'][2]), "prioridad": int(self.tree.item(item)['values'][3]) if algo == "Prioridad" else None}
+            {"nombre": self.tree.item(item)['values'][0], 
+             "rafaga": int(self.tree.item(item)['values'][1]),
+             "tiempo de llegada": int(self.tree.item(item)['values'][2]),
+             "prioridad": int(self.tree.item(item)['values'][3]) if algo == "Prioridad" else None}
             for item in self.tree.get_children()
         ]
 
